@@ -33,19 +33,19 @@ class SceneRenderer:
         self._viewer = viewing_mode
         if viewing_mode:
             self._viewer = pyrender.Viewer(
-                self._scene, 
-                use_raymond_lighting=True, 
+                self._scene,
+                use_raymond_lighting=True,
                 run_in_thread=True)
-            
+
         self._intrinsics = intrinsics
         if self._intrinsics == 'realsense':
             self._fx=616.36529541
-            self._fy=616.20294189 
-            self._cx=310.25881958 
-            self._cy=236.59980774 
+            self._fy=616.20294189
+            self._cx=310.25881958
+            self._cy=236.59980774
             self._znear=0.04
-            self._zfar=20 
-            self._height=480 
+            self._zfar=20
+            self._height=480
             self._width=640
         elif self._intrinsics == 'kinect_azure':
             self._fx=631.54864502
@@ -53,22 +53,22 @@ class SceneRenderer:
             self._cx=638.43517329
             self._cy=366.49904066
             self._znear=0.04
-            self._zfar=20 
-            self._height=720 
+            self._zfar=20
+            self._height=720
             self._width=1280
-            
+
         self._add_table_node()
         self._init_camera_renderer()
-        
+
         self._current_context = None
         self._cache = {} if caching else None
         self._caching = caching
-    
+
     def _init_camera_renderer(self):
         """
         If not in visualizing mode, initialize camera with given intrinsics
         """
-        
+
         if self._viewer:
             return
 
@@ -104,7 +104,7 @@ class SceneRenderer:
 
         Arguments:
             path {str} -- path to mesh
-            scale {float} -- scale of the mesh 
+            scale {float} -- scale of the mesh
 
         Returns:
             dict -- contex with loaded mesh info
@@ -113,7 +113,7 @@ class SceneRenderer:
             return self._cache[(path, scale)]
         obj = Object(path)
         obj.rescale(scale)
-        
+
         tmesh = obj.mesh
         tmesh_mean = np.mean(tmesh.vertices, 0)
         tmesh.vertices -= np.expand_dims(tmesh_mean, 0)
@@ -126,18 +126,18 @@ class SceneRenderer:
 
         context = {
             'name': path + '_' + str(scale),
-            'tmesh': copy.deepcopy(tmesh), 
-            'distance': object_distance, 
+            'tmesh': copy.deepcopy(tmesh),
+            'distance': object_distance,
             'node': pyrender.Node(mesh=mesh, name=path + '_' + str(scale)),
             'mesh_mean': np.expand_dims(tmesh_mean, 0),
         }
-        
+
         self._cache[(path, scale)] = context
 
         return self._cache[(path, scale)]
-    
+
     def change_scene(self, obj_paths, obj_scales, obj_transforms):
-        """Remove current objects and add new ones to the scene 
+        """Remove current objects and add new ones to the scene
 
         Arguments:
             obj_paths {list} -- list of object mesh paths
@@ -152,7 +152,7 @@ class SceneRenderer:
 
         if not self._caching:
             self._cache = {}
-            
+
         for p,t,s in zip(obj_paths, obj_transforms, obj_scales):
 
             object_context = self._load_object(p, s)
@@ -163,7 +163,7 @@ class SceneRenderer:
 
         if self._viewer:
             self._viewer.render_lock.release()
-    
+
     def _to_pointcloud(self, depth):
         """Convert depth map to point cloud
 
@@ -182,10 +182,10 @@ class SceneRenderer:
             cy = self._cy
 
             mask = np.where(depth > 0)
-                
+
             x = mask[1]
             y = mask[0]
-            
+
             normalized_x = (x.astype(np.float32) - cx)
             normalized_y = (y.astype(np.float32) - cy)
         else:
@@ -197,17 +197,17 @@ class SceneRenderer:
 
             x = mask[1]
             y = mask[0]
-            
+
             normalized_x = (x.astype(np.float32) - width * 0.5) / width
             normalized_y = (y.astype(np.float32) - height * 0.5) / height
-        
+
         world_x = normalized_x * depth[y, x] / fx
         world_y = normalized_y * depth[y, x] / fy
         world_z = depth[y, x]
         ones = np.ones(world_z.shape[0], dtype=np.float32)
 
         return np.vstack((world_x, world_y, world_z, ones)).T
-        
+
 
     def render(self, pose, render_pc=True):
         """Render object or scene in camera pose
@@ -224,9 +224,9 @@ class SceneRenderer:
 
         transferred_pose = pose.copy()
         self._scene.set_pose(self._camera_node, transferred_pose)
-            
+
         color, depth = self.renderer.render(self._scene)
-        
+
         if render_pc:
             pc = self._to_pointcloud(depth)
         else:
@@ -246,7 +246,7 @@ class SceneRenderer:
             render_pc {bool} -- whether to return object-wise point clouds (default: {False})
 
         Returns:
-            [np.ndarray, list, dict] -- integer segmap with 0=background, list of 
+            [np.ndarray, list, dict] -- integer segmap with 0=background, list of
                                         corresponding object names, dict of corresponding point clouds
         """
 
@@ -254,12 +254,12 @@ class SceneRenderer:
         for n in self._scene.get_nodes():
             if n.name not in ['camera', 'parent']:
                 n.mesh.is_visible = False
-                if n.name != 'table': 
+                if n.name != 'table':
                     scene_object_nodes.append(n)
 
         obj_names = [path + '_' + str(scale) for path, scale in zip(obj_paths,obj_scales)]
 
-        
+
         pcs = {}
         output = np.zeros(full_depth.shape, np.uint8)
         for n in scene_object_nodes:
@@ -273,33 +273,21 @@ class SceneRenderer:
                 continue
             if np.any(output[mask] != 0):
                 raise ValueError('wrong label')
-            
+
             indices = [i+1 for i, x in enumerate(obj_names) if x == n.name]
             for i in indices:
                 if not np.any(output==i):
                     print('')
                     output[mask] = i
-                    break 
+                    break
 
             n.mesh.is_visible = False
 
             if render_pc:
                 pcs[i] = self._to_pointcloud(depth*mask)
-            
+
         for n in self._scene.get_nodes():
             if n.name not in ['camera', 'parent']:
                 n.mesh.is_visible = True
-        
+
         return output, ['BACKGROUND'] + obj_names, pcs
-            
-
-
-
-
-
-
-    
-    
-
-
-

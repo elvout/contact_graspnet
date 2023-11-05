@@ -78,7 +78,7 @@ class PandaGripper(object):
         """
         self.joint_limits = [0.0, 0.04]
         self.root_folder = root_folder
-        
+
         self.default_pregrasp_configuration = 0.04
         if q is None:
             q = self.default_pregrasp_configuration
@@ -95,7 +95,7 @@ class PandaGripper(object):
         self.finger_l.apply_transform(tra.euler_matrix(0, 0, np.pi))
         self.finger_l.apply_translation([+q, 0, 0.0584])
         self.finger_r.apply_translation([-q, 0, 0.0584])
-        
+
         self.fingers = trimesh.util.concatenate([self.finger_l, self.finger_r])
         self.hand = trimesh.util.concatenate([self.fingers, self.base])
 
@@ -122,7 +122,7 @@ class PandaGripper(object):
             list of trimesh -- visual meshes
         """
         return [self.finger_l, self.finger_r, self.base]
-        
+
     def get_closing_rays_contact(self, transform):
         """Get an array of rays defining the contact locations and directions on the hand.
 
@@ -136,7 +136,7 @@ class PandaGripper(object):
         """
         return transform[:3, :].dot(
             self.contact_ray_origins.T).T, transform[:3, :3].dot(self.contact_ray_directions.T).T
-        
+
     def get_control_point_tensor(self, batch_size, use_tf=True, symmetric = False, convex_hull=True):
         """
         Outputs a 5 point gripper representation of shape (batch_size x 5 x 3).
@@ -150,7 +150,7 @@ class PandaGripper(object):
             convex_hull {bool} -- Return control points according to the convex hull panda gripper model (default: {True})
 
         Returns:
-            np.ndarray -- control points of the panda gripper 
+            np.ndarray -- control points of the panda gripper
         """
 
         control_points = np.load(os.path.join(self.root_folder, 'gripper_control_points/panda.npy'))[:, :3]
@@ -271,5 +271,5 @@ def grasp_contact_location(transforms, successfuls, collisions, object_mesh, gri
                     # dot_prods = (contact_dict['contact_face_normals'] * contact_dict['contact_directions']).sum(axis=1)
                     # contact_dict['contact_cosine_angles'] = np.cos(dot_prods)
                     res.append(contact_dict)
-                
+
     return res

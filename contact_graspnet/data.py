@@ -21,7 +21,7 @@ from scene_renderer import SceneRenderer
 
 def load_scene_contacts(dataset_folder, test_split_only=False, num_test=None, scene_contacts_path='scene_contacts_new'):
     """
-    Load contact grasp annotations from acronym scenes 
+    Load contact grasp annotations from acronym scenes
 
     Arguments:
         dataset_folder {str} -- folder with acronym data and scene contacts
@@ -34,7 +34,7 @@ def load_scene_contacts(dataset_folder, test_split_only=False, num_test=None, sc
     Returns:
         list(dicts) -- list of scene annotations dicts with object paths and transforms and grasp contacts and transforms.
     """
-    
+
     scene_contact_paths = sorted(glob.glob(os.path.join(dataset_folder, scene_contacts_path, '*')))
     if test_split_only:
         scene_contact_paths = scene_contact_paths[-num_test:]
@@ -55,7 +55,7 @@ def load_scene_contacts(dataset_folder, test_split_only=False, num_test=None, sc
 
 def preprocess_pc_for_inference(input_pc, num_point, pc_mean=None, return_mean=False, use_farthest_point=False, convert_to_internal_coords=False):
     """
-    Various preprocessing of the point cloud (downsampling, centering, coordinate transforms)  
+    Various preprocessing of the point cloud (downsampling, centering, coordinate transforms)
 
     Arguments:
         input_pc {np.ndarray} -- Nx3 input point cloud
@@ -75,7 +75,7 @@ def preprocess_pc_for_inference(input_pc, num_point, pc_mean=None, return_mean=F
         pc = regularize_pc_point_count(input_pc, num_point, use_farthest_point=use_farthest_point).copy()
     else:
         pc = input_pc.copy()
-    
+
     if convert_to_internal_coords:
         pc[:,:2] *= -1
 
@@ -124,15 +124,15 @@ def farthest_points(data, nclusters, dist_func, return_center_indexes=False, ret
         data: numpy array of the data points.
         nclusters: int, number of clusters.
         dist_dunc: distance function that is used to compare two data points.
-        return_center_indexes: bool, If True, returns the indexes of the center of 
+        return_center_indexes: bool, If True, returns the indexes of the center of
           clusters.
         return_distances: bool, If True, return distances of each point from centers.
-      
+
       Returns clusters, [centers, distances]:
-        clusters: numpy array containing the cluster index for each element in 
+        clusters: numpy array containing the cluster index for each element in
           data.
         centers: numpy array containing the integer index of each center.
-        distances: numpy array of [npoints] that contains the closest distance of 
+        distances: numpy array of [npoints] that contains the closest distance of
           each point to any of the cluster centers.
     """
     if nclusters >= data.shape[0]:
@@ -190,14 +190,14 @@ def regularize_pc_point_count(pc, npoints, use_farthest_point=False):
     """
       If point cloud pc has less points than npoints, it oversamples.
       Otherwise, it downsample the input pc to have npoint points.
-      use_farthest_point: indicates 
-      
+      use_farthest_point: indicates
+
       :param pc: Nx3 point cloud
       :param npoints: number of points the regularized point cloud should have
       :param use_farthest_point: use farthest point sampling to downsample the points, runs slower.
       :returns: npointsx3 regularized point cloud
     """
-    
+
     if pc.shape[0] > npoints:
         if use_farthest_point:
             _, center_indexes = farthest_points(pc, npoints, distance_by_translation_point, return_center_indexes=True)
@@ -221,7 +221,7 @@ def depth2pc(depth, K, rgb=None):
 
     mask = np.where(depth > 0)
     x,y = mask[1], mask[0]
-    
+
     normalized_x = (x.astype(np.float32) - K[0,2])
     normalized_y = (y.astype(np.float32) - K[1,2])
 
@@ -231,7 +231,7 @@ def depth2pc(depth, K, rgb=None):
 
     if rgb is not None:
         rgb = rgb[y,x,:]
-        
+
     pc = np.vstack((world_x, world_y, world_z)).T
     return (pc, rgb)
 
@@ -252,7 +252,7 @@ def estimate_normals_cam_from_pc(self, pc_cam, max_radius=0.05, k=12):
     """
     tree = cKDTree(pc_cam, leafsize=pc_cam.shape[0]+1)
     _, ndx = tree.query(pc_cam, k=k, distance_upper_bound=max_radius, n_jobs=-1) # num_points x k
-    
+
     for c,idcs in enumerate(ndx):
         idcs[idcs==pc_cam.shape[0]] = c
         ndx[c,:] = idcs
@@ -285,21 +285,21 @@ def vectorized_normal_computation(pc, neighbors):
 
 def load_available_input_data(p, K=None):
     """
-    Load available data from input file path. 
-    
+    Load available data from input file path.
+
     Numpy files .npz/.npy should have keys
     'depth' + 'K' + (optionally) 'segmap' + (optionally) 'rgb'
     or for point clouds:
     'xyz' + (optionally) 'xyz_color'
-    
+
     png files with only depth data (in mm) can be also loaded.
     If the image path is from the GraspNet dataset, corresponding rgb, segmap and intrinic are also loaded.
-      
+
     :param p: .png/.npz/.npy file path that contain depth/pointcloud and optionally intrinsics/segmentation/rgb
     :param K: 3x3 Camera Matrix with intrinsics
     :returns: All available data among segmap, rgb, depth, cam_K, pc_full, pc_colors
     """
-    
+
     segmap, rgb, depth, pc_full, pc_colors = None, None, None, None, None
 
     cam_K = np.eye(3)
@@ -336,11 +336,11 @@ def load_available_input_data(p, K=None):
             depth = data['depth']
         if K is None and 'K' in keys:
             cam_K = data['K'].reshape(3,3)
-        if 'segmap' in keys:    
+        if 'segmap' in keys:
             segmap = data['segmap']
-        if 'seg' in keys:    
+        if 'seg' in keys:
             segmap = data['seg']
-        if 'rgb' in keys:    
+        if 'rgb' in keys:
             rgb = data['rgb'].astype(np.uint8)
             rgb = np.array(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
         # Load xyz if both it and depth exist
@@ -358,11 +358,11 @@ def load_available_input_data(p, K=None):
             depth = np.array(Image.open(p))
     else:
         raise ValueError('{} is neither png nor npz/npy file'.format(p))
-    
+
     return segmap, rgb, depth, cam_K, pc_full, pc_colors
 
 def load_graspnet_data(rgb_image_path):
-    
+
     """
     Loads data from the GraspNet-1Billion dataset
     # https://graspnet.net/
@@ -370,7 +370,7 @@ def load_graspnet_data(rgb_image_path):
     :param rgb_image_path: .png file path to depth image in graspnet dataset
     :returns: (depth, rgb, segmap, K)
     """
-    
+
     depth = np.array(Image.open(rgb_image_path))/1000. # m to mm
     segmap = np.array(Image.open(rgb_image_path.replace('depth', 'label')))
     rgb = np.array(Image.open(rgb_image_path.replace('depth', 'rgb')))
@@ -380,7 +380,7 @@ def load_graspnet_data(rgb_image_path):
     depth = np.rot90(depth,2)
     segmap = np.rot90(segmap,2)
     rgb = np.rot90(rgb,2)
-    
+
     if 'kinect' in rgb_image_path:
         # Kinect azure:
         K=np.array([[631.54864502 ,  0.    ,     638.43517329],
@@ -397,9 +397,9 @@ def load_graspnet_data(rgb_image_path):
 def center_pc_convert_cam(cam_poses, batch_data):
     """
     Converts from OpenGL to OpenCV coordinates, computes inverse of camera pose and centers point cloud
-    
+
     :param cam_poses: (bx4x4) Camera poses in OpenGL format
-    :param batch_data: (bxNx3) point clouds 
+    :param batch_data: (bxNx3) point clouds
     :returns: (cam_poses, batch_data) converted
     """
     # OpenCV OpenGL conversion
@@ -411,9 +411,9 @@ def center_pc_convert_cam(cam_poses, batch_data):
     pc_mean = np.mean(batch_data, axis=1, keepdims=True)
     batch_data[:,:,:3] -= pc_mean[:,:,:3]
     cam_poses[:,:3,3] -= pc_mean[:,0,:3]
-    
+
     return cam_poses, batch_data
-    
+
 
 class PointCloudReader:
     """
@@ -493,7 +493,7 @@ class PointCloudReader:
             self._all_poses = [tra.quaternion_matrix(q) for q in quaternions]
         else:
             self._cam_orientations = []
-            self._elevation = np.array(elevation)/180. 
+            self._elevation = np.array(elevation)/180.
             for az in np.linspace(0, np.pi * 2, 30):
                 for el in np.linspace(self._elevation[0], self._elevation[1], 30):
                     self._cam_orientations.append(tra.euler_matrix(0, -el, az))
@@ -501,7 +501,7 @@ class PointCloudReader:
 
     def get_cam_pose(self, cam_orientation):
         """
-        Samples camera pose on shell around table center 
+        Samples camera pose on shell around table center
 
         Arguments:
             cam_orientation {np.ndarray} -- 3x3 camera orientation matrix
@@ -509,7 +509,7 @@ class PointCloudReader:
         Returns:
             [np.ndarray] -- 4x4 homogeneous camera pose
         """
-        
+
         distance = self._distance_range[0] + np.random.rand()*(self._distance_range[1]-self._distance_range[0])
 
         extrinsics = np.eye(4)
@@ -532,19 +532,19 @@ class PointCloudReader:
         Returns:
             np.ndarray -- augmented point cloud
         """
-        
+
         # not used because no artificial occlusion
         if 'occlusion_nclusters' in self._pc_augm_config and self._pc_augm_config['occlusion_nclusters'] > 0:
             pc = self.apply_dropout(pc,
-                                    self._pc_augm_config['occlusion_nclusters'], 
+                                    self._pc_augm_config['occlusion_nclusters'],
                                     self._pc_augm_config['occlusion_dropout_rate'])
 
         if 'sigma' in self._pc_augm_config and self._pc_augm_config['sigma'] > 0:
-            pc = provider.jitter_point_cloud(pc[np.newaxis, :, :], 
-                                            sigma=self._pc_augm_config['sigma'], 
+            pc = provider.jitter_point_cloud(pc[np.newaxis, :, :],
+                                            sigma=self._pc_augm_config['sigma'],
                                             clip=self._pc_augm_config['clip'])[0]
-        
-        
+
+
         return pc[:,:3]
 
     def _augment_depth(self, depth):
@@ -568,7 +568,7 @@ class PointCloudReader:
             depth_copy = depth.copy()
             depth = cv2.GaussianBlur(depth,(kernel,kernel),0)
             depth[depth_copy==0] = depth_copy[depth_copy==0]
-                
+
         return depth
 
     def apply_dropout(self, pc, occlusion_nclusters, occlusion_dropout_rate):
@@ -596,7 +596,7 @@ class PointCloudReader:
         for l in removed_labels:
             mask = np.logical_and(mask, labels != l)
         return pc[mask]
-    
+
     def get_scene_batch(self, scene_idx=None, return_segmap=False, save=False):
         """
         Render a batch of scene point clouds
@@ -623,7 +623,7 @@ class PointCloudReader:
         self.change_scene(obj_paths, mesh_scales, obj_trafos, visualize=False)
 
         batch_segmap, batch_obj_pcs = [], []
-        for i in range(self._batch_size):            
+        for i in range(self._batch_size):
             # 0.005s
             pc_cam, pc_normals, camera_pose, depth = self.render_random_scene(estimate_normals = self._estimate_normals)
 
@@ -636,7 +636,7 @@ class PointCloudReader:
             if self._estimate_normals:
                 batch_data[i,:,3:6] = pc_normals[:,:3]
             cam_poses[i,:,:] = camera_pose
-            
+
         if save:
             K = np.array([[616.36529541,0,310.25881958 ],[0,616.20294189,236.59980774],[0,0,1]])
             data = {'depth':depth, 'K':K, 'camera_pose':camera_pose, 'scene_idx':scene_idx}
@@ -670,11 +670,11 @@ class PointCloudReader:
         # 0.005 s
         _, depth, _, camera_pose = self._renderer.render(in_camera_pose, render_pc=False)
         depth = self._augment_depth(depth)
-        
+
         pc = self._renderer._to_pointcloud(depth)
         pc = regularize_pc_point_count(pc, self._raw_num_points, use_farthest_point=self._use_farthest_point)
         pc = self._augment_pc(pc)
-        
+
         pc_normals = estimate_normals_cam_from_pc(pc[:,:3], raw_num_points=self._raw_num_points) if estimate_normals else []
 
         return pc, pc_normals, camera_pose, depth
@@ -710,5 +710,3 @@ class PointCloudReader:
 
     def __del__(self):
         print('********** terminating renderer **************')
-    
-

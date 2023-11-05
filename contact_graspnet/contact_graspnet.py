@@ -21,7 +21,7 @@ import mesh_utils
 
 def placeholder_inputs(batch_size, num_input_points=20000, input_normals=False):
     """
-    Creates placeholders for input pointclouds, scene indices, camera poses and training/eval mode 
+    Creates placeholders for input pointclouds, scene indices, camera poses and training/eval mode
 
     Arguments:
         batch_size {int} -- batch size
@@ -51,7 +51,7 @@ def get_bin_vals(global_config):
         global_config {dict} -- config
 
     Returns:
-        tf.constant -- bin value tensor 
+        tf.constant -- bin value tensor
     """
     bins_bounds = np.array(global_config['DATA']['labels']['offset_bins'])
     if global_config['TEST']['bin_vals'] == 'max':
@@ -64,7 +64,7 @@ def get_bin_vals(global_config):
 
     if not global_config['TEST']['allow_zero_margin']:
         bin_vals = np.minimum(bin_vals, global_config['DATA']['gripper_width']-global_config['TEST']['extra_opening'])
-        
+
     tf_bin_vals = tf.constant(bin_vals, tf.float32)
     return tf_bin_vals
 
@@ -90,19 +90,19 @@ def get_model(point_cloud, is_training, global_config, bn_decay=None):
     radius_list_0 = model_config['pointnet_sa_modules_msg'][0]['radius_list']
     radius_list_1 = model_config['pointnet_sa_modules_msg'][1]['radius_list']
     radius_list_2 = model_config['pointnet_sa_modules_msg'][2]['radius_list']
-    
+
     nsample_list_0 = model_config['pointnet_sa_modules_msg'][0]['nsample_list']
     nsample_list_1 = model_config['pointnet_sa_modules_msg'][1]['nsample_list']
     nsample_list_2 = model_config['pointnet_sa_modules_msg'][2]['nsample_list']
-    
+
     mlp_list_0 = model_config['pointnet_sa_modules_msg'][0]['mlp_list']
     mlp_list_1 = model_config['pointnet_sa_modules_msg'][1]['mlp_list']
     mlp_list_2 = model_config['pointnet_sa_modules_msg'][2]['mlp_list']
-    
+
     npoint_0 = model_config['pointnet_sa_modules_msg'][0]['npoint']
     npoint_1 = model_config['pointnet_sa_modules_msg'][1]['npoint']
     npoint_2 = model_config['pointnet_sa_modules_msg'][2]['npoint']
-    
+
     fp_mlp_0 = model_config['pointnet_fp_modules'][0]['mlp']
     fp_mlp_1 = model_config['pointnet_fp_modules'][1]['mlp']
     fp_mlp_2 = model_config['pointnet_fp_modules'][2]['mlp']
@@ -117,7 +117,7 @@ def get_model(point_cloud, is_training, global_config, bn_decay=None):
 
     end_points = {}
     l0_xyz = tf.slice(point_cloud, [0,0,0], [-1,-1,3])
-    l0_points = tf.slice(point_cloud, [0,0,3], [-1,-1,3]) if input_normals else None 
+    l0_points = tf.slice(point_cloud, [0,0,3], [-1,-1,3]) if input_normals else None
 
     # Set abstraction layers
     l1_xyz, l1_points = pointnet_sa_module_msg(l0_xyz, l0_points, npoint_0, radius_list_0, nsample_list_0, mlp_list_0, is_training, bn_decay, scope='layer1')
@@ -140,7 +140,7 @@ def get_model(point_cloud, is_training, global_config, bn_decay=None):
         # Feature Propagation layers
         l2_points = pointnet_fp_module(l2_xyz, l3_xyz, l2_points, l3_points, fp_mlp_0, is_training, bn_decay, scope='fa_layer1')
         l1_points = pointnet_fp_module(l1_xyz, l2_xyz, l1_points, l2_points, fp_mlp_1, is_training, bn_decay, scope='fa_layer2')
-        l0_points = tf.concat([l0_xyz, l0_points],axis=-1) if input_normals else l0_xyz 
+        l0_points = tf.concat([l0_xyz, l0_points],axis=-1) if input_normals else l0_xyz
         l0_points = pointnet_fp_module(l0_xyz, l1_xyz, l0_points, l1_points, fp_mlp_2, is_training, bn_decay, scope='fa_layer3')
         pred_points = l0_xyz
 
@@ -163,7 +163,7 @@ def get_model(point_cloud, is_training, global_config, bn_decay=None):
         approach_dir_head = tf_util.dropout(approach_dir_head, keep_prob=0.7, is_training=is_training, scope='dp1_app')
         approach_dir_head = tf_util.conv1d(approach_dir_head, 3, 1, padding='VALID', activation_fn=None, scope='fc3_app')
         approach_dir_head_orthog = tf.math.l2_normalize(approach_dir_head - tf.reduce_sum(tf.multiply(grasp_dir_head_normed, approach_dir_head), axis=2, keepdims=True)*grasp_dir_head_normed, axis=2)
-        
+
         # Head for grasp width
         if model_config['dir_vec_length_offset']:
             grasp_offset_head = tf.norm(grasp_dir_head, axis=2, keepdims=True)
@@ -208,7 +208,7 @@ def build_6d_grasp(approach_dirs, base_dirs, contact_pts, thickness, use_tf=Fals
         np.ndarray -- Nx4x4 grasp poses in camera coordinates
     """
     if use_tf:
-        grasps_R = tf.stack([base_dirs, tf.linalg.cross(approach_dirs,base_dirs),approach_dirs], axis=3)        
+        grasps_R = tf.stack([base_dirs, tf.linalg.cross(approach_dirs,base_dirs),approach_dirs], axis=3)
         grasps_t = contact_pts + tf.expand_dims(thickness,2)/2 * base_dirs - gripper_depth * approach_dirs
         ones = tf.ones((contact_pts.shape[0], contact_pts.shape[1], 1, 1), dtype=tf.float32)
         zeros = tf.zeros((contact_pts.shape[0], contact_pts.shape[1], 1, 3), dtype=tf.float32)
@@ -223,7 +223,7 @@ def build_6d_grasp(approach_dirs, base_dirs, contact_pts, thickness, use_tf=Fals
             grasp[:3,2] = approach_dirs[i] / np.linalg.norm(approach_dirs[i])
             grasp_y = np.cross( grasp[:3,2],grasp[:3,0])
             grasp[:3,1] = grasp_y / np.linalg.norm(grasp_y)
-            # base_gripper xyz = contact + thickness / 2 * baseline_dir - gripper_d * approach_dir 
+            # base_gripper xyz = contact + thickness / 2 * baseline_dir - gripper_d * approach_dir
             grasp[:3,3] = contact_pts[i] + thickness[i] / 2 * grasp[:3,0] - gripper_depth * grasp[:3,2]
             # grasp[0,3] = finger_width
             grasps.append(grasp)
@@ -233,19 +233,19 @@ def build_6d_grasp(approach_dirs, base_dirs, contact_pts, thickness, use_tf=Fals
 
 def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam, global_config):
     """
-    Computes loss terms from pointclouds, network predictions and labels 
+    Computes loss terms from pointclouds, network predictions and labels
 
     Arguments:
         pointclouds_pl {tf.placeholder} -- bxNx3 input point clouds
         end_points {dict[str:tf.variable]} -- endpoints of the network containing predictions
         dir_labels_pc_cam {tf.variable} -- base direction labels in camera coordinates (bxNx3)
-        offset_labels_pc {tf.variable} -- grasp width labels (bxNx1) 
-        grasp_success_labels_pc {tf.variable} -- contact success labels (bxNx1) 
+        offset_labels_pc {tf.variable} -- grasp width labels (bxNx1)
+        grasp_success_labels_pc {tf.variable} -- contact success labels (bxNx1)
         approach_labels_pc_cam {tf.variable} -- approach direction labels in camera coordinates (bxNx3)
-        global_config {dict} -- config dict 
-        
+        global_config {dict} -- config dict
+
     Returns:
-        [dir_cosine_loss, bin_ce_loss, offset_loss, approach_cosine_loss, adds_loss, 
+        [dir_cosine_loss, bin_ce_loss, offset_loss, approach_cosine_loss, adds_loss,
         adds_loss_gt2pred, gt_control_points, pred_control_points, pos_grasps_in_view] -- All losses (not all are used for training)
     """
 
@@ -255,9 +255,9 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
 
     bin_weights = global_config['DATA']['labels']['bin_weights']
     tf_bin_weights = tf.constant(bin_weights)
-    
+
     min_geom_loss_divisor = tf.constant(float(global_config['LOSS']['min_geom_loss_divisor'])) if 'min_geom_loss_divisor' in global_config['LOSS'] else tf.constant(1.)
-    pos_grasps_in_view = tf.math.maximum(tf.reduce_sum(grasp_success_labels_pc, axis=1), min_geom_loss_divisor)   
+    pos_grasps_in_view = tf.math.maximum(tf.reduce_sum(grasp_success_labels_pc, axis=1), min_geom_loss_divisor)
 
     ### ADS Gripper PC Loss
     if global_config['MODEL']['bin_offsets']:
@@ -269,7 +269,7 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
     pred_grasps = build_6d_grasp(approach_dir_head, grasp_dir_head, pointclouds_pl, thickness_pred, use_tf=True) # b x num_point x 4 x 4
     gt_grasps_proj = build_6d_grasp(approach_labels_pc_cam, dir_labels_pc_cam, pointclouds_pl, thickness_gt, use_tf=True) # b x num_point x 4 x 4
     pos_gt_grasps_proj = tf.where(tf.broadcast_to(tf.expand_dims(tf.expand_dims(tf.cast(grasp_success_labels_pc, tf.bool),2),3), gt_grasps_proj.shape), gt_grasps_proj, tf.ones_like(gt_grasps_proj)*100000)
-    # pos_gt_grasps_proj = tf.reshape(pos_gt_grasps_proj, (global_config['OPTIMIZER']['batch_size'], -1, 4, 4)) 
+    # pos_gt_grasps_proj = tf.reshape(pos_gt_grasps_proj, (global_config['OPTIMIZER']['batch_size'], -1, 4, 4))
 
     gripper = mesh_utils.create_gripper('panda')
     gripper_control_points = gripper.get_control_point_tensor(global_config['OPTIMIZER']['batch_size']) # b x 5 x 3
@@ -277,7 +277,7 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
 
     gripper_control_points_homog =  tf.concat([gripper_control_points, tf.ones((global_config['OPTIMIZER']['batch_size'], gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
     sym_gripper_control_points_homog =  tf.concat([sym_gripper_control_points, tf.ones((global_config['OPTIMIZER']['batch_size'], gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
-    
+
     # only use per point pred grasps but not per point gt grasps
     control_points = tf.keras.backend.repeat_elements(tf.expand_dims(gripper_control_points_homog,1), gt_grasps_proj.shape[1], axis=1)  # b x num_point x 5 x 4
     sym_control_points = tf.keras.backend.repeat_elements(tf.expand_dims(sym_gripper_control_points_homog,1), gt_grasps_proj.shape[1], axis=1)  # b x num_point x 5 x 4
@@ -310,15 +310,15 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
     min_adds_gt2pred = tf.minimum(-neg_squared_adds_k_gt2pred, -neg_squared_adds_k_sym_gt2pred) # b x num_pos_grasp_point x 1
     # min_adds_gt2pred = tf.math.exp(-min_adds_gt2pred)
     masked_min_adds_gt2pred = tf.multiply(min_adds_gt2pred[:,:,0], grasp_success_labels_pc)
-    
+
     batch_idcs = tf.meshgrid(tf.range(pred_grasp_idcs_joined.shape[1]), tf.range(pred_grasp_idcs_joined.shape[0]))
     gather_idcs = tf.stack((batch_idcs[1],pred_grasp_idcs_joined[:,:,0]), axis=2)
     nearest_pred_grasp_confidence = tf.gather_nd(end_points['binary_seg_pred'][:,:,0], gather_idcs)
     adds_loss_gt2pred = tf.reduce_mean(tf.reduce_sum(nearest_pred_grasp_confidence*masked_min_adds_gt2pred, axis=1) / pos_grasps_in_view)
- 
+
     ### Grasp baseline Loss
     cosine_distance = tf.constant(1.)-tf.reduce_sum(tf.multiply(dir_labels_pc_cam, grasp_dir_head),axis=2)
-    # only pass loss where we have labeled contacts near pc points 
+    # only pass loss where we have labeled contacts near pc points
     masked_cosine_loss = tf.multiply(cosine_distance, grasp_success_labels_pc)
     dir_cosine_loss = tf.reduce_mean(tf.reduce_sum(masked_cosine_loss, axis=1) / pos_grasps_in_view)
 
@@ -334,7 +334,7 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
             offset_loss = tf.losses.softmax_cross_entropy(offset_labels_pc, grasp_offset_head)
         else:
             offset_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=offset_labels_pc, logits=grasp_offset_head)
-            
+
             if 'too_small_offset_pred_bin_factor' in global_config['LOSS'] and global_config['LOSS']['too_small_offset_pred_bin_factor']:
                 too_small_offset_pred_bin_factor = tf.constant(global_config['LOSS']['too_small_offset_pred_bin_factor'], tf.float32)
                 collision_weight = tf.math.cumsum(offset_labels_pc, axis=2, reverse=True)*too_small_offset_pred_bin_factor + tf.constant(1.)
@@ -343,7 +343,7 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
             offset_loss = tf.reduce_mean(tf.multiply(tf.reshape(tf_bin_weights,(1,1,-1)), offset_loss),axis=2)
     else:
         offset_loss = (grasp_offset_head[:,:,0] - offset_labels_pc[:,:,0])**2
-    masked_offset_loss = tf.multiply(offset_loss, grasp_success_labels_pc)        
+    masked_offset_loss = tf.multiply(offset_loss, grasp_success_labels_pc)
     offset_loss = tf.reduce_mean(tf.reduce_sum(masked_offset_loss, axis=1) / pos_grasps_in_view)
 
     ### Grasp Confidence Loss
@@ -376,7 +376,7 @@ def multi_bin_labels(cont_labels, bin_boundaries):
 
 def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_approaches_mesh, pos_finger_diffs, pc_cam_pl, camera_pose_pl, global_config):
     """
-    Project grasp labels defined on meshes onto rendered point cloud from a camera pose via nearest neighbor contacts within a maximum radius. 
+    Project grasp labels defined on meshes onto rendered point cloud from a camera pose via nearest neighbor contacts within a maximum radius.
     All points without nearby successful grasp contacts are considered negativ contact points.
 
     Arguments:
@@ -400,18 +400,18 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     z_val = label_config['z_val']
 
     xyz_cam = pc_cam_pl[:,:,:3]
-    pad_homog = tf.ones((xyz_cam.shape[0],xyz_cam.shape[1], 1)) 
+    pad_homog = tf.ones((xyz_cam.shape[0],xyz_cam.shape[1], 1))
     pc_mesh = tf.matmul(tf.concat([xyz_cam, pad_homog], 2), tf.transpose(tf.linalg.inv(camera_pose_pl),perm=[0, 2, 1]))[:,:,:3]
 
     contact_point_offsets_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_finger_diffs,0), pc_mesh.shape[0], axis=0)
 
-    pad_homog2 = tf.ones((pc_mesh.shape[0], pos_contact_dirs_mesh.shape[0], 1)) 
+    pad_homog2 = tf.ones((pc_mesh.shape[0], pos_contact_dirs_mesh.shape[0], 1))
     contact_point_dirs_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_contact_dirs_mesh,0), pc_mesh.shape[0], axis=0)
     contact_point_dirs_batch_cam = tf.matmul(contact_point_dirs_batch, tf.transpose(camera_pose_pl[:,:3,:3], perm=[0, 2, 1]))[:,:,:3]
 
     pos_contact_approaches_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_contact_approaches_mesh,0), pc_mesh.shape[0], axis=0)
     pos_contact_approaches_batch_cam = tf.matmul(pos_contact_approaches_batch, tf.transpose(camera_pose_pl[:,:3,:3], perm=[0, 2, 1]))[:,:,:3]
-    
+
     contact_point_batch_mesh = tf.keras.backend.repeat_elements(tf.expand_dims(pos_contact_pts_mesh,0), pc_mesh.shape[0], axis=0)
     contact_point_batch_cam = tf.matmul(tf.concat([contact_point_batch_mesh, pad_homog2], 2), tf.transpose(camera_pose_pl, perm=[0, 2, 1]))[:,:,:3]
 
@@ -433,6 +433,5 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     dir_labels_pc_cam = tf.math.l2_normalize(tf.reduce_mean(grouped_dirs_pc_cam, axis=2),axis=2) # (batch_size, num_point, 3)
     approach_labels_pc_cam = tf.math.l2_normalize(tf.reduce_mean(grouped_approaches_pc_cam, axis=2),axis=2) # (batch_size, num_point, 3)
     offset_labels_pc = tf.reduce_mean(grouped_offsets, axis=2)
-        
-    return dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam
 
+    return dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam

@@ -1,0 +1,37 @@
+name: catkin build CI
+
+on: push
+
+jobs:
+  build:
+    # Although the build is run inside a 20.04 container, we need to explicitly
+    # specify 20.04 here so actions/setup-python installs the right Python 3.10
+    # binary.
+    runs-on: ubuntu-20.04
+    container:
+      # If this image consumes too much disk space, we can switch to
+      # nvidia/cuda:11.8.0-devel-ubuntu20.04 and set LD_LIBRARY_PATH to point to
+      # the cudnn8 libraries bundled with pytorch.
+      image: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: "src/${{ github.repository_id }}"
+      - name: Inspect directory contents
+        run: apt-get update && apt-get install --yes tree && pwd && tree
+      - uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.9
+            3.8
+      - name: Install ROS base
+        run: |
+          apt-get update && apt-get install -y curl
+          sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
+          curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+          apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ros-noetic-ros-core
+      - name: Install build dependencies
+        run: python3.8 -m pip install catkin-pkg catkin-tools empy
+      - name: Run catkin build
+        run: . /opt/ros/noetic/setup.sh && catkin build --no-status

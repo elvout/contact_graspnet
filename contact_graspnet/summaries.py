@@ -26,7 +26,7 @@ def top_grasp_acc_summaries(ops, thres=[0.62,0.65,0.68]):
     Returns:
         [tf.variable] -- summary update ops
     """
-    
+
     binary_seg = tf.reshape(ops['binary_seg_pred'],[ops['binary_seg_pred'].shape[0],ops['binary_seg_pred'].shape[1]])
     max_conf_idcs = tf.argmax(binary_seg, axis=1)
     max_confs = tf.math.reduce_max(binary_seg, axis=1)
@@ -90,7 +90,7 @@ def build_summary_ops(ops, sess, global_config):
 
     acc_update_ops = top_grasp_acc_summaries(ops, thres=[0.62,0.65,0.68])
 
-    auc, auc_update_op = tf.metrics.auc(tf.layers.flatten(tf.cast(ops['grasp_suc_labels_pc'], tf.bool)), 
+    auc, auc_update_op = tf.metrics.auc(tf.layers.flatten(tf.cast(ops['grasp_suc_labels_pc'], tf.bool)),
                                         tf.layers.flatten(ops['binary_seg_pred']), curve='PR', summation_method='careful_interpolation')
     tf.summary.scalar('AUCPR', auc)
 
@@ -102,7 +102,7 @@ def build_summary_ops(ops, sess, global_config):
 
     pr_reset_op = tf.variables_initializer(tf.get_collection(tf.GraphKeys.METRIC_VARIABLES))
     merged_eval = tf.summary.merge_all()
-    
+
     sess.run(tf.local_variables_initializer())
 
     summary_ops = {'merged': merged, 'merged_eval': merged_eval, 'pr_update_op':pr_update_op, 'auc_update_op':auc_update_op, 'acc_update_ops':acc_update_ops, 'pr_reset_op': pr_reset_op}
