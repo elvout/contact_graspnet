@@ -34,4 +34,4 @@ jobs:
       - name: Install build dependencies
         run: python3.8 -m pip install catkin-pkg catkin-tools empy
       - name: Run catkin build
-        run: . /opt/ros/noetic/setup.sh && catkin build --no-status
+        run: . /opt/ros/noetic/setup.sh && catkin build --no-status --verbose
