@@ -1,8 +1,9 @@
 [tool.poetry]
-name = "contact-graspnet"
-version = "0.1.0"
+name = "contact_graspnet"
+version = "0.0.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = []
+maintainers = ["Elvin Yang <eyy@umich.edu>"]
 readme = "README.md"
 
 
