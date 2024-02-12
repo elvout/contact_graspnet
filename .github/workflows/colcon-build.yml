@@ -1,0 +1,54 @@
+name: colcon build
+
+on:
+  push:
+    branches:
+      - "**humble"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container:
+      # If this image consumes too much disk space, we can switch to
+      # nvidia/cuda:11.8.0-devel-ubuntu22.04 and set LD_LIBRARY_PATH to point to
+      # the cudnn8 libraries bundled with pytorch.
+      image: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+      volumes:
+        - /mnt:/mnt
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: "src/${{ github.repository_id }}"
+      - name: Inspect directory contents
+        run: apt update && apt install --yes tree && pwd && tree
+      - name: Disk information
+        run: |
+          df -h
+      - name: Install dependencies for poetry
+        run: |
+          apt update && apt install -y curl python3 python3-pip
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Install ROS base
+        run: |
+          apt update && apt install -y locales
+          locale-gen en_US en_US.UTF-8
+          update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+          export LANG=en_US.UTF-8
+          apt update && apt install --yes software-properties-common
+          add-apt-repository universe
+          curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+          apt update && DEBIAN_FRONTEND=noninteractive apt install -y ros-humble-ros-core
+          python3.10 -m pip install colcon-common-extensions catkin-pkg
+      - name: Disk information
+        run: |
+          df -h
+      - name: Perform build in /mnt
+        run: |
+          mkdir -p /mnt/ws
+          cp -a $(pwd) /mnt/ws/
+      - name: Run colcon build
+        working-directory: /mnt/ws
+        run: . /opt/ros/humble/setup.sh && CI=true colcon build

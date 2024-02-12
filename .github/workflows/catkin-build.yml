@@ -1,6 +1,9 @@
 name: catkin build CI
 
-on: push
+on:
+  push:
+    branches:
+      - "**noetic"
 
 jobs:
   build:
