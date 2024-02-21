@@ -1,6 +1,5 @@
-"""
-Usage: python3 -m rosnode.inference_node
-"""
+import sys
+import threading
 from typing import Optional, Sequence
 
 import cv2
@@ -9,13 +8,16 @@ import numpy as np
 from loguru import logger
 from scipy.spatial.transform import Rotation
 
-import rospy
+import rclpy
+from builtin_interfaces.msg import Duration, Time
 from cv_bridge import CvBridge
+from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from visualization_msgs.msg import Marker, MarkerArray
 
-from .contact_graspnet_wrapper import ContactGraspnetParams, ContactGraspnetWrapper
-from .oneformer_wrapper import OneFormerParams, OneFormerWrapper
+from .contact_graspnet_wrapper import ContactGraspnetWrapper
+from .oneformer_wrapper import OneFormerWrapper
+from .parameters import ContactGraspnetNodeParams
 
 
 class ColorGenerator:
@@ -38,93 +40,74 @@ class ColorGenerator:
         return color
 
 
-class ContactGraspnetInferencePubSub:
+class ContactGraspnetNode(Node):
     def __init__(self) -> None:
-        ##################################
-        # Contact Graspnet-related setup #
-        ##################################
-        contact_graspnet_params = ContactGraspnetParams()
-        contact_graspnet_params.ckpt_dir = rospy.get_param(
-            "contact_graspnet_ckpt_dir",
-            default="checkpoints/scene_test_2048_bs3_hor_sigma_001",
-        )
-        contact_graspnet_params.z_range[0] = rospy.get_param("z_min", default=0.2)
-        contact_graspnet_params.z_range[1] = rospy.get_param("z_max", default=1.8)
-        contact_graspnet_params.local_regions = rospy.get_param(
-            "local_regions", default=True
-        )
-        contact_graspnet_params.filter_grasps = rospy.get_param(
-            "filter_grasps", default=True
-        )
-        contact_graspnet_params.forward_passes = rospy.get_param(
-            "forward_passes", default=1
-        )
-        contact_graspnet_params.skip_border_objects = rospy.get_param(
-            "skip_border_objects", default=False
-        )
-        contact_graspnet_params.segmap_id = rospy.get_param("segmap_id", default=0)
+        super().__init__("contact_graspnet")
 
-        self._contact_graspnet = ContactGraspnetWrapper(contact_graspnet_params)
+        self._params = ContactGraspnetNodeParams.read_from_ros(self)
 
-        ###########################
-        # OneFormer-related setup #
-        ###########################
-        oneformer_params = OneFormerParams()
-        oneformer_params.stretch_robot_rotate_image_90deg = rospy.get_param(
-            "stretch_robot_rotate_image_90deg", default=True
-        )
-        self._oneformer = OneFormerWrapper(oneformer_params)
+        self._contact_graspnet = ContactGraspnetWrapper(self._params.contact_graspnet)
+        self._oneformer = OneFormerWrapper(self._params.oneformer)
 
         #####################
         # ROS-related setup #
         #####################
-        camera_info_topic: str = rospy.get_param(
-            "camera_info_topic", default="/camera/aligned_depth_to_color/camera_info"
+        self._marker_pub = self.create_publisher(
+            Marker, "/contact_graspnet/best_grasp", 1
         )
-        # Subscribe to the uncompressed image since there seems to be some
-        # difficulty subscribing to the /compressedDepth topic.
-        depth_topic: str = rospy.get_param(
-            "depth_topic", default="/camera/aligned_depth_to_color/image_raw"
+        self._marker_array_pub = self.create_publisher(
+            MarkerArray, "/contact_graspnet/all_grasps", 1
         )
-        rgb_topic: str = rospy.get_param(
-            "rgb_topic", default="/camera/color/image_raw/compressed"
+        self._debug_img_pub = self.create_publisher(
+            CompressedImage, "/contact_graspnet/vis/compressed", 1
         )
 
-        # Perform a blocking read of a single CameraInfo message instead of
-        # creating a persistent subscriber.
-        logger.info("Waiting 5s for CameraInfo...")
-        camera_info_msg: CameraInfo = rospy.wait_for_message(
-            camera_info_topic, CameraInfo, timeout=5
-        )
-        self._intrinsic_matrix = np.array(camera_info_msg.K).reshape((3, 3))
+        # Data usd by subscribers and callbacks
+        self._msg_lock = threading.Lock()
+        self._intrinsic_matrix: Optional[np.ndarray] = None
         self._rgb_msg: Optional[CompressedImage] = None
         self._depth_msg: Optional[Image] = None
         self._cv_bridge = CvBridge()
 
-        self._marker_pub = rospy.Publisher(
-            "/contact_graspnet/best_grasp", Marker, queue_size=1
-        )
-        self._marker_array_pub = rospy.Publisher(
-            "/contact_graspnet/all_grasps", MarkerArray, queue_size=1
-        )
-        self._debug_img_pub = rospy.Publisher(
-            "/contact_graspnet/vis/compressed", CompressedImage, queue_size=1
-        )
-
         # TODO(elvout): how to we make sure these messages are synchronized?
         # Maybe track timestamps and only use timestamps with both messages
-        self._rgb_sub = rospy.Subscriber(
-            rgb_topic, CompressedImage, self._rgb_callback, queue_size=1
+        self._camera_info_sub = self.create_subscription(
+            CameraInfo,
+            self._params.camera_info_sub_topic,
+            self._camera_info_callback,
+            1,
         )
-        self._depth_sub = rospy.Subscriber(
-            depth_topic, Image, self._depth_callback, queue_size=1
+        self._rgb_sub = self.create_subscription(
+            CompressedImage, self._params.rgb_sub_topic, self._rgb_callback, 1
         )
+        self._depth_sub = self.create_subscription(
+            Image, self._params.depth_sub_topic, self._depth_callback, 1
+        )
+
+        # TODO(elvout): switch to ros service
+        self._inference_timer = self.create_timer(
+            1 / 10, self.run_inference_and_publish_poses
+        )
+
+    def _camera_info_callback(self, msg: CameraInfo) -> None:
+        with self._msg_lock:
+            self._intrinsic_matrix = np.array(msg.k).reshape((3, 3))
+
+        # Assuming that the intrinsic matrix does not change, we only need to
+        # receive one CameraInfo message. In ROS 1, we used
+        # rospy.wait_for_message to avoid keeping track of a Subscriber object.
+        # ROS 2 Humble does not have this feature (although it has since been
+        # introduced https://github.com/ros2/rclpy/pull/960), so we manually
+        # destroy the Subscription after receiving the CameraInfo message.
+        self.destroy_subscription(self._camera_info_sub)
 
     def _rgb_callback(self, msg: CompressedImage) -> None:
-        self._rgb_msg = msg
+        with self._msg_lock:
+            self._rgb_msg = msg
 
     def _depth_callback(self, msg: Image) -> None:
-        self._depth_msg = msg
+        with self._msg_lock:
+            self._depth_msg = msg
 
     def _grasp_pose_to_marker(self, pose: np.ndarray) -> Marker:
         """The caller is responsible for setting the frame_id, namespace, and
@@ -144,8 +127,8 @@ class ContactGraspnetInferencePubSub:
         quat = Rotation.from_matrix(pose[:3, :3]).as_quat()
 
         marker = Marker()
-        marker.header.stamp = rospy.Time(0)
-        marker.lifetime = rospy.Time.from_sec(1.5)
+        marker.header.stamp = Time()
+        marker.lifetime = Duration(sec=1, nanosec=int(0.5 * 1e9))
         marker.type = Marker.ARROW
 
         marker.scale.x = 0.08  # gripper length
@@ -166,15 +149,27 @@ class ContactGraspnetInferencePubSub:
         return marker
 
     def run_inference_and_publish_poses(self) -> None:
-        if self._rgb_msg is None or self._depth_msg is None:
-            return
+        with self._msg_lock:
+            if (
+                self._intrinsic_matrix is None
+                or self._rgb_msg is None
+                or self._depth_msg is None
+            ):
+                return
 
-        rgb_msg_header = self._rgb_msg.header
-        bgr_image = self._cv_bridge.compressed_imgmsg_to_cv2(self._rgb_msg)
-        depth_image = (
-            self._cv_bridge.imgmsg_to_cv2(self._depth_msg).astype(np.float32) / 1000.0
-        )
-        rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+            rgb_msg_header = self._rgb_msg.header
+
+            bgr_image = self._cv_bridge.compressed_imgmsg_to_cv2(self._rgb_msg)
+            depth_image = (
+                self._cv_bridge.imgmsg_to_cv2(self._depth_msg).astype(np.float32)
+                / 1000.0
+            )
+            rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+
+            # Discard existing messages so that inference is only run again once
+            # we have new data.
+            self._rgb_msg = None
+            self._depth_msg = None
 
         oneformer_output = self._oneformer.forward(rgb_image)
 
@@ -221,15 +216,13 @@ class ContactGraspnetInferencePubSub:
 
 
 def main() -> None:
+    rclpy.init(args=sys.argv)
+
     logger.info("Starting node initialization...")
-    rospy.init_node("contact_graspnet")
-    pubsub = ContactGraspnetInferencePubSub()
+    node = ContactGraspnetNode()
     logger.success("Node initialized.")
 
-    rate = rospy.Rate(10)
-    while not rospy.is_shutdown():
-        pubsub.run_inference_and_publish_poses()
-        rate.sleep()  # TODO(elvout): take into account inference latency?
+    rclpy.spin(node)
 
 
 if __name__ == "__main__":
