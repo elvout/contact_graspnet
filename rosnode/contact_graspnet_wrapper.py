@@ -24,39 +24,14 @@ import contact_graspnet.config_utils
 import contact_graspnet.visualization_utils
 from contact_graspnet.contact_grasp_estimator import GraspEstimator
 
+from rosnode.parameters import ContactGraspnetParams
+
 # Set up tensorflow options.
 # Copied from contact_graspnet/inference.py
 tf.disable_eager_execution()
 # These two lines cause pytorch to crash
 # physical_devices = tf.config.experimental.list_physical_devices("GPU")
 # tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
-
-@dataclass
-class ContactGraspnetParams:
-    ckpt_dir: str = field(default="checkpoints/scene_test_2048_bs3_hor_sigma_001")
-    z_range: list[float] = field(default_factory=lambda: [0.2, 1.8])
-    """Z value threshold to croup to input point cloud."""
-
-    local_regions: bool = field(default=False)
-    """Whether to crop 3D local regions around given segments."""
-
-    filter_grasps: bool = field(default=False)
-    """Whether to filter grasp contacts according to segmentation maps."""
-
-    skip_border_objects: bool = field(default=False)
-    """Whether to ignore segments at the depth map boundary when extracting
-    local regions."""
-
-    forward_passes: int = field(default=1)
-    """Number of parallel forward passes to run in mesh_utils for more potential
-    contact points."""
-
-    segmap_id: int = field(default=0)
-    """Only return grasps with the given segment id (0 = all)."""
-
-    visualize_grasps: bool = field(default=False)
-    """Whether to generate grasp visualization images."""
 
 
 class ContactGraspnetWrapper:

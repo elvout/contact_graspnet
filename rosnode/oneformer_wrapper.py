@@ -13,20 +13,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from matplotlib import cm
 
-
-@dataclass
-class OneFormerParams:
-    pretrained_model_name: str = field(default="shi-labs/oneformer_ade20k_swin_large")
-    """
-    List of model names: https://huggingface.co/models?other=oneformer
-    """
-
-    visualize_segmentation: bool = field(default=False)
-    """Whether or not to generate visualization images."""
-
-    stretch_robot_rotate_image_90deg: bool = field(default=False)
-    """The Stretch robot's camera is mounted at a 90deg angle. This perspective
-    is generally incompatible with OneFormer."""
+from rosnode.parameters import OneFormerParams
 
 
 class OneFormerWrapper:
