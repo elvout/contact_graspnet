@@ -14,43 +14,33 @@ priority = "supplemental"
 
 
 [tool.poetry.dependencies]
-python = "~3.9"
+python = "~3.10"
 matplotlib = "~3.6"
 mayavi = "^4.7.1"
 opencv-python-headless = "^4"
 pillow = "^10.1.0"
-# protobuf needs to be pinned at 3.20.x or lower to run compile_pointnet_tfops.sh
-# https://protobuf.dev/news/2022-05-06/#python-updates
-protobuf = "~3.20"
 pyqt5 = "~5.9"
 pyrender = "^0.1.45"
 pyside2 = "^5.15.2.1"
 pyyaml = "^6.0.1"
 rtree = "^1.1.0"
 scipy = "~1.9"
-tensorboard = "=2.5.0"
-tensorflow = "=2.5.0"
-tensorflow-estimator = "=2.5.0"
+tensorboard = "~2.12"
+# Tensorflow/CUDA compatibility matrix:
+# https://www.tensorflow.org/install/source#gpu
+# 2.12 is the last version that is able to successfuly run
+# compile_pointnet_tfops.sh without raising a VRAM OOM.
+tensorflow = "~2.12"
+tensorflow-estimator = "~2.12"
 tqdm = "^4.66.1"
 
 [tool.poetry.group.oneformer.dependencies]
 transformers = "^4.35.2"
-# pytorch >=2.1.0 includes an import from a typing_extensions version that
-# conflicts with the version requirement of tensorflow 2.5.0
-torch = { version = "2.0.1+cu118", source="pytorch" }
-torchvision = { version = "0.15.2+cu118", source="pytorch" }
+torch = { version = "2.1.1+cu118", source = "pytorch" }
+torchvision = { version = "0.16.1+cu118", source = "pytorch" }
 
-[tool.poetry.group.ros.dependencies]
+[tool.poetry.group.rosnode.dependencies]
 loguru = "^0.7.2"
-pycryptodomex = "^3.19.0"
-python-gnupg = "^0.5.1"
-pyyaml = "^6.0.1"
-rospkg = "^1.5.0"
-
-[tool.poetry.group.dev.dependencies]
-ipykernel = "^6.26.0"
-ipywidgets = "^8.1.1"
-jupyter = "^1.0.0"
 
 
 [build-system]
