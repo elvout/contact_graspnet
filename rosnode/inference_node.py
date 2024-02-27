@@ -15,10 +15,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from visualization_msgs.msg import Marker, MarkerArray
 
-from .contact_graspnet_wrapper import ContactGraspnetWrapper
-from .oneformer_wrapper import OneFormerWrapper
-from .parameters import ContactGraspnetNodeParams
-
+from rosnode.contact_graspnet_wrapper import ContactGraspnetWrapper
+from rosnode.oneformer_wrapper import OneFormerWrapper
+from rosnode.parameters import ContactGraspnetNodeParams
 
 class ColorGenerator:
     def __init__(self) -> None:

@@ -9,6 +9,3 @@ logger.add(
     colorize=True,
     format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level}</level> | <cyan>{file}:{line}</cyan> - <level>{message}</level>",
 )
-
-
-from . import inference_node  # noqa: F401, E402
