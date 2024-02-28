@@ -14,7 +14,7 @@
 
   <node
     pkg="contact_graspnet"
-    name="inference_node"
+    name="contact_graspnet_node"
     launch-prefix="$(find-pkg-prefix contact_graspnet)/.venv/bin/python"
     exec="python_entrypoint.py"
     output="screen"
