@@ -55,7 +55,7 @@ set(
 )
 file(
     DOWNLOAD
-    https://drive.google.com/uc?export=download&id=1OUaDmLD2OkNc77ca1wjJ_C5lwP5vMdXZ
+    https://www.dropbox.com/scl/fi/uak2hrpwxq7qx302c0vud/checkpoints_minimal_inference.tar.gz?rlkey=8sgqektsng0jj49cqdcrv0kjn&dl=1
     ${CHECKPOINT_ARCHIVE}
     EXPECTED_HASH SHA256=e030e0653db41562a56fed2fc27469522db3f5a5f72dbcb0f13a64716bf41c43
 )
